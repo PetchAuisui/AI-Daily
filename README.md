@@ -12,21 +12,24 @@ npm run db:migrate           # สร้างตาราง (รันซ้�
 npm run dev                  # http://localhost:3000
 ```
 
-## Deploy (ตัวอย่าง: Vercel + Neon)
+## Deploy (Vercel + Neon, ฟรี)
 
-1. สร้างฐานข้อมูล Postgres ฟรีที่ [Neon](https://neon.tech) (หรือ Supabase / Railway / Vercel Postgres) แล้วคัดลอก connection string
-   — บน serverless แนะนำใช้ **pooled** URL (Neon: host ที่มี `-pooler`)
-2. รัน migration ครั้งเดียวจากเครื่อง:
-   ```bash
-   DATABASE_URL="postgres://...?sslmode=require" npm run db:migrate
-   ```
-3. Push โค้ดขึ้น GitHub → Import โปรเจกต์ใน Vercel → ตั้ง Environment Variable `DATABASE_URL` → Deploy
+`npm run build` จะรัน migration ให้อัตโนมัติถ้ามี `DATABASE_URL` (ไม่มีก็ข้าม) จึงไม่ต้องสร้างตารางเอง
 
+1. ไปที่ [vercel.com/new](https://vercel.com/new) → Import repo `AI-Daily` → กด **Deploy**
+   (ครั้งแรกจะยังใช้ไม่ได้เพราะยังไม่มี DB — ปกติ)
+2. ในโปรเจกต์ Vercel → แท็บ **Storage** → **Create Database** → เลือก **Neon (Postgres)** → Connect กับโปรเจกต์นี้
+   Vercel จะตั้ง `DATABASE_URL` / `POSTGRES_URL` ให้เอง
+3. แท็บ **Deployments** → เมนู ⋯ ของ deploy ล่าสุด → **Redeploy** → build จะสร้างตารางแล้วแอปพร้อมใช้
+
+หลังจากนี้ทุกครั้งที่ `git push` ขึ้น `main` Vercel จะ deploy ให้อัตโนมัติ
+
+ใช้ DB เจ้าอื่น (Supabase / Railway / Neon โดยตรง) ก็ได้ แค่ตั้ง `DATABASE_URL` เอง — บน serverless แนะนำ **pooled** URL
 แพลตฟอร์มที่รัน Node ได้ (Railway, Render, Fly.io, VPS) ใช้ `npm run build && npm start` ได้เลย
 
 | Env | ความหมาย |
 | --- | --- |
-| `DATABASE_URL` | Postgres connection string (จำเป็น) |
+| `DATABASE_URL` | Postgres connection string (จำเป็น, หรือใช้ `POSTGRES_URL` แทนได้) |
 | `PGSSL=require` | บังคับ SSL แบบไม่ verify cert (ใช้เมื่อ provider ไม่รองรับ `?sslmode=require`) |
 | `PG_POOL_MAX` | จำนวน connection สูงสุดต่อ instance (ค่าเริ่มต้น 5) |
 

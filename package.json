@@ -5,7 +5,7 @@
   "description": "Monitor weekly AI token usage and get a daily budget",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/migrate.mjs --optional && next build",
     "start": "next start",
     "db:migrate": "node scripts/migrate.mjs"
   },

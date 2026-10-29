@@ -12,13 +12,20 @@ for (const f of ['.env.local', '.env']) {
   }
 }
 
-if (!process.env.DATABASE_URL) {
+// Vercel + Neon integration ตั้งชื่อตัวแปรเป็น POSTGRES_URL ด้วย
+const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+if (!url) {
+  // --optional: ใช้ตอน build — ถ้ายังไม่มี DB ก็ข้ามไป ไม่ให้ build พัง
+  if (process.argv.includes('--optional')) {
+    console.warn('DATABASE_URL is not set — skipping migration');
+    process.exit(0);
+  }
   console.error('DATABASE_URL is not set');
   process.exit(1);
 }
 
 const client = new pg.Client({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: url,
   ssl: process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : undefined,
 });
 await client.connect();

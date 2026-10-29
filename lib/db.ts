@@ -9,9 +9,10 @@ const g = globalThis as unknown as { __pgPool?: Pool };
 
 function getPool(): Pool {
   if (!g.__pgPool) {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+    const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    if (!url) throw new Error('DATABASE_URL is not set');
     g.__pgPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: url,
       ssl: process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : undefined,
       max: Number(process.env.PG_POOL_MAX) || 5,
     });
