@@ -8,6 +8,20 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower ON users (lower(username));
+-- ผู้ใช้ที่สมัครผ่าน OAuth ไม่มีรหัสผ่าน
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN salt DROP NOT NULL;
+
+-- บัญชี OAuth (Google / GitHub) ที่ผูกกับ users
+CREATE TABLE IF NOT EXISTS accounts (
+  provider         TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (provider, provider_user_id)
+);
+CREATE INDEX IF NOT EXISTS accounts_user ON accounts (user_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,
