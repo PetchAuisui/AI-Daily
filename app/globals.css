@@ -169,6 +169,7 @@ input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; }
 .sw-ok { background: var(--bar); }
 .sw-over { background: var(--over); }
+.sw-prev { background: var(--bar); opacity: .35; }
 .sw-line { height: 2px; width: 14px; background: var(--text); vertical-align: 3px; border-radius: 0; }
 
 /* Entries */

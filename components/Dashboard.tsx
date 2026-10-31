@@ -129,11 +129,12 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
 
                 <div className="card">
                   <div className="card-head">
-                    <h3>รายวันในสัปดาห์นี้</h3>
+                    <h3>ยอดสะสมรอบนี้</h3>
                     <div className="legend">
-                      <span><i className="sw sw-ok" />ใช้ตามงบ</span>
-                      <span><i className="sw sw-over" />เกินงบ</span>
-                      <span><i className="sw sw-line" />งบต่อวัน</span>
+                      <span><i className="sw sw-prev" />สะสมก่อนหน้า</span>
+                      <span><i className="sw sw-ok" />วันนั้น</span>
+                      <span><i className="sw sw-over" />เกินแผน</span>
+                      <span><i className="sw sw-line" />แผนสะสม</span>
                     </div>
                   </div>
                   <WeekChart c={c} unit={tracker.unit} />
