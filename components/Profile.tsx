@@ -7,15 +7,22 @@ import { addDays, compute, statusOf, weekStartFor, type Budget, type Status } fr
 import { dateTH, fmtU, timeTH } from '@/lib/format';
 import { SPECIES_TH, mascotFor, parseMascot, type Mood } from '@/lib/mascots';
 import type { Tracker, UsageEntry, User } from '@/lib/types';
+import Logo from './Logo';
 import Mascot from './Mascot';
+import { PROVIDER_LABEL, ProviderIcon, type Provider } from './ProviderIcon';
 import TrackerDialog from './TrackerDialog';
 
-type Props = { user: User; memberSince: string | null; initialTrackers: Tracker[] };
+type Account = { provider: Provider; email: string | null };
+type Props = {
+  user: User; memberSince: string | null; initialTrackers: Tracker[];
+  providers: Provider[]; initialAccounts: Account[]; hasPassword: boolean;
+  notice: { tone: 'ok' | 'over'; text: string } | null;
+};
 
 const MOOD: Record<Status, Mood> = { ok: 'happy', warn: 'worried', over: 'dizzy', off: 'sleepy' };
 const STATUS_TH: Record<Status, string> = { ok: 'สบาย', warn: 'ใกล้ครบ', over: 'เกินงบ', off: 'วันพัก' };
 
-export default function Profile({ user, memberSince, initialTrackers }: Props) {
+export default function Profile({ user, memberSince, initialTrackers, providers, initialAccounts, hasPassword, notice }: Props) {
   const [trackers, setTrackers] = useState(initialTrackers);
   const [budgets, setBudgets] = useState<Record<number, Budget>>({});
   const [dialog, setDialog] = useState<{ open: boolean; tracker: Tracker | null }>({ open: false, tracker: null });
@@ -42,7 +49,7 @@ export default function Profile({ user, memberSince, initialTrackers }: Props) {
   return (
     <section>
       <header className="topbar">
-        <Link href="/" className="logo">🤖 AI Daily</Link>
+        <Link href="/" className="logo"><Logo /> AI Daily</Link>
         <div className="user">
           <Link href="/" className="btn ghost sm">‹ กลับหน้าหลัก</Link>
         </div>
@@ -62,6 +69,10 @@ export default function Profile({ user, memberSince, initialTrackers }: Props) {
           </div>
         </div>
 
+        {notice && <div className={`notice ${notice.tone}`} role="status">{notice.text}</div>}
+
+        {providers.length > 0 && <LinkedAccounts providers={providers} initial={initialAccounts} hasPassword={hasPassword} />}
+
         <div className="card-head"><h3>เพื่อนร่วมทาง AI ของคุณ</h3></div>
         {!trackers.length ? (
           <div className="card empty">
@@ -80,6 +91,59 @@ export default function Profile({ user, memberSince, initialTrackers }: Props) {
       <TrackerDialog open={dialog.open} tracker={dialog.tracker}
         onClose={() => setDialog({ open: false, tracker: null })} onSaved={onSaved} />
     </section>
+  );
+}
+
+// เชื่อม/ยกเลิกการเชื่อมบัญชี OAuth — การเชื่อมใช้ flow เดียวกับ login (callback ผูกเข้ากับ user ที่ login อยู่)
+function LinkedAccounts({ providers, initial, hasPassword }: { providers: Provider[]; initial: Account[]; hasPassword: boolean }) {
+  const [accounts, setAccounts] = useState(initial);
+  const [busy, setBusy] = useState<Provider | null>(null);
+  const [error, setError] = useState('');
+  // ห้ามยกเลิกช่องทางสุดท้าย ไม่งั้นจะเข้าบัญชีไม่ได้อีก
+  const isLast = !hasPassword && accounts.length <= 1;
+
+  async function unlink(p: Provider) {
+    if (!confirm(`ยกเลิกการเชื่อมบัญชี ${PROVIDER_LABEL[p]}?`)) return;
+    setBusy(p);
+    setError('');
+    try {
+      await api(`/api/auth/oauth/${p}`, { method: 'DELETE' });
+      setAccounts((a) => a.filter((x) => x.provider !== p));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-head"><h3>บัญชีที่เชื่อมไว้</h3></div>
+      <p className="muted sm">เชื่อมแล้วจะเข้าสู่ระบบบัญชีนี้ด้วยช่องทางนั้นได้ ข้อมูล AI ทั้งหมดยังอยู่ที่เดิม</p>
+      <ul className="linked-list">
+        {providers.map((p) => {
+          const acc = accounts.find((a) => a.provider === p);
+          return (
+            <li key={p}>
+              <ProviderIcon p={p} />
+              <div className="linked-info">
+                <b>{PROVIDER_LABEL[p]}</b>
+                <span className="muted sm">{acc ? acc.email ?? 'เชื่อมแล้ว' : 'ยังไม่ได้เชื่อม'}</span>
+              </div>
+              {acc ? (
+                <button className="btn ghost sm" disabled={busy === p || isLast} onClick={() => unlink(p)}
+                  title={isLast ? 'เป็นช่องทางเข้าสู่ระบบเดียวที่เหลือ' : undefined}>
+                  ยกเลิกการเชื่อม
+                </button>
+              ) : (
+                <a className="btn sm" href={`/api/auth/oauth/${p}`}>เชื่อมบัญชี</a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {error && <div className="error">{error}</div>}
+    </div>
   );
 }
 
