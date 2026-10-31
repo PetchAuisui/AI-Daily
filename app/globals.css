@@ -218,6 +218,14 @@ a.btn { text-decoration: none; display: inline-block; }
   width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
   background: var(--primary); color: var(--primary-ink); font-size: 1.6rem; font-weight: 700;
 }
+.notice { border-radius: 10px; padding: .7rem 1rem; margin-bottom: 1rem; font-size: .9rem; }
+.notice.ok { background: var(--ok-soft); color: var(--ok); }
+.notice.over { background: var(--over-soft); color: var(--over); }
+.linked-list { list-style: none; margin: .75rem 0 0; padding: 0; }
+.linked-list li { display: flex; align-items: center; gap: .75rem; padding: .6rem 0; border-top: 1px solid var(--border); }
+.linked-list svg { flex-shrink: 0; display: block; }
+.linked-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.linked-info .sm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-count { margin-left: auto; text-align: right; display: flex; flex-direction: column; }
 .profile-count b { font-size: 1.6rem; line-height: 1.1; }
 .mascot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }

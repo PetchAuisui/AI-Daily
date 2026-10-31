@@ -77,6 +77,9 @@ export async function finishAuth(p: ProviderId, origin: string, code: string, ve
   return { id: String(user.id), email, name: user.name || user.login, login: user.login };
 }
 
+/** บัญชี OAuth นี้ผูกกับ user อื่นที่มีข้อมูลอยู่แล้ว — ไม่ย้ายให้เอง */
+export class LinkedElsewhereError extends Error {}
+
 /**
  * หา user ที่ผูกกับบัญชี OAuth นี้ ถ้ายังไม่มี:
  * - ถ้ามีคน login อยู่ (linkTo) → ผูกเข้ากับบัญชีนั้น
@@ -88,9 +91,21 @@ export async function upsertOAuthUser(p: ProviderId, profile: Profile, linkTo: n
     'SELECT user_id FROM accounts WHERE provider = $1 AND provider_user_id = $2',
     [p, profile.id],
   );
+  if (existing && linkTo != null && existing.user_id !== linkTo) {
+    // ผูกอยู่กับ user อื่น: ย้ายมาได้เฉพาะเมื่อ user นั้นยังไม่มี AI ที่ติดตาม (เช่น เผลอกด login ด้วย Google ไว้ก่อน)
+    const used = await queryOne('SELECT 1 FROM trackers WHERE user_id = $1 LIMIT 1', [existing.user_id]);
+    if (used) throw new LinkedElsewhereError(`${p} account belongs to user ${existing.user_id}`);
+    await query('UPDATE accounts SET user_id = $3, email = $4 WHERE provider = $1 AND provider_user_id = $2',
+      [p, profile.id, linkTo, profile.email]);
+    return linkTo;
+  }
   if (existing) {
     await query('UPDATE accounts SET email = $3 WHERE provider = $1 AND provider_user_id = $2', [p, profile.id, profile.email]);
     return existing.user_id;
+  }
+  if (linkTo != null && await queryOne('SELECT 1 FROM accounts WHERE user_id = $1 AND provider = $2', [linkTo, p])) {
+    // ผูก provider นี้ไว้แล้วกับบัญชีอื่นของ provider เดียวกัน — ให้ยกเลิกอันเดิมก่อน
+    throw new LinkedElsewhereError(`user ${linkTo} already has a ${p} account`);
   }
   let userId = linkTo;
   if (userId == null) {
@@ -110,4 +125,24 @@ export async function upsertOAuthUser(p: ProviderId, profile: Profile, linkTo: n
     [p, profile.id, userId, profile.email],
   );
   return userId;
+}
+
+export type LinkedAccount = { provider: ProviderId; email: string | null };
+
+/** บัญชี OAuth ที่ผูกกับ user + มีรหัสผ่านหรือไม่ (ใช้ตัดสินว่ายกเลิกการเชื่อมได้ไหม) */
+export async function loginMethods(userId: number) {
+  const [accounts, pw] = await Promise.all([
+    query<LinkedAccount>('SELECT provider, email FROM accounts WHERE user_id = $1 ORDER BY created_at', [userId]),
+    queryOne<{ has: boolean }>('SELECT password_hash IS NOT NULL AS has FROM users WHERE id = $1', [userId]),
+  ]);
+  return { accounts, hasPassword: !!pw?.has };
+}
+
+/** ยกเลิกการเชื่อม — ไม่ยอมถ้าเป็นช่องทางเข้าสู่ระบบสุดท้าย */
+export async function unlinkAccount(userId: number, p: ProviderId): Promise<'ok' | 'missing' | 'last'> {
+  const { accounts, hasPassword } = await loginMethods(userId);
+  if (!accounts.some((a) => a.provider === p)) return 'missing';
+  if (!hasPassword && accounts.length === 1) return 'last';
+  await query('DELETE FROM accounts WHERE user_id = $1 AND provider = $2', [userId, p]);
+  return 'ok';
 }

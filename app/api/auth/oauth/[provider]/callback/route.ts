@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createSession, currentUser } from '@/lib/auth';
-import { STATE_COOKIE, VERIFIER_COOKIE, appOrigin, finishAuth, isProvider, upsertOAuthUser } from '@/lib/oauth';
+import { LinkedElsewhereError, STATE_COOKIE, VERIFIER_COOKIE, appOrigin, finishAuth, isProvider, upsertOAuthUser } from '@/lib/oauth';
 
 type Ctx = { params: Promise<{ provider: string }> };
 
@@ -15,7 +15,10 @@ export async function GET(req: Request, { params }: Ctx) {
   jar.delete(STATE_COOKIE);
   jar.delete(VERIFIER_COOKIE);
 
-  const back = (error: string) => NextResponse.redirect(`${origin}/login?error=${error}`);
+  // login อยู่แล้ว = กำลังเชื่อมบัญชีจากหน้าโปรไฟล์ → ส่งกลับไปที่นั่น
+  const me = await currentUser();
+  const back = (error: string) =>
+    NextResponse.redirect(me ? `${origin}/profile?link_error=${error}` : `${origin}/login?error=${error}`);
   if (!isProvider(provider)) return back('provider');
   // ผู้ใช้กดยกเลิกที่หน้ายินยอม
   if (url.searchParams.get('error')) return back('cancelled');
@@ -24,12 +27,12 @@ export async function GET(req: Request, { params }: Ctx) {
 
   try {
     const profile = await finishAuth(provider, origin, code, verifier);
-    const me = await currentUser();
     const userId = await upsertOAuthUser(provider, profile, me?.id ?? null);
-    if (!me || me.id !== userId) await createSession(userId);
+    if (!me) await createSession(userId);
   } catch (err) {
+    if (err instanceof LinkedElsewhereError) return back('linked_elsewhere');
     console.error(`OAuth ${provider} callback failed`, err);
     return back('oauth');
   }
-  return NextResponse.redirect(`${origin}/`);
+  return NextResponse.redirect(me ? `${origin}/profile?linked=${provider}` : `${origin}/`);
 }
