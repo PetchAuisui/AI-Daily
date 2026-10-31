@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS trackers (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS trackers_user ON trackers (user_id);
+-- ตัวละครประจำ AI (NULL = เลือกอัตโนมัติจากชื่อ)
+ALTER TABLE trackers ADD COLUMN IF NOT EXISTS mascot TEXT;
 
 CREATE TABLE IF NOT EXISTS usage (
   id         SERIAL PRIMARY KEY,

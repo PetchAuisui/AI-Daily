@@ -13,9 +13,9 @@ export async function PUT(req: Request, { params }: Ctx) {
   if ('error' in r) return fail(r.error);
   const t = r.tracker;
   const row = await queryOne<Tracker>(
-    `UPDATE trackers SET name=$1, weekly_limit=$2, unit=$3, reset_dow=$4, reset_hour=$5, active_days=$6, reserve_pct=$7
-     WHERE id=$8 RETURNING ${TRACKER_COLS}`,
-    [t.name, t.weekly_limit, t.unit, t.reset_dow, t.reset_hour, t.active_days, t.reserve_pct, id],
+    `UPDATE trackers SET name=$1, weekly_limit=$2, unit=$3, reset_dow=$4, reset_hour=$5, active_days=$6, reserve_pct=$7, mascot=$8
+     WHERE id=$9 RETURNING ${TRACKER_COLS}`,
+    [t.name, t.weekly_limit, t.unit, t.reset_dow, t.reset_hour, t.active_days, t.reserve_pct, t.mascot, id],
   );
   return json(row);
 }

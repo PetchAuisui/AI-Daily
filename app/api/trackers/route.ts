@@ -15,9 +15,9 @@ export async function POST(req: Request) {
   if ('error' in r) return fail(r.error);
   const t = r.tracker;
   const row = await queryOne<Tracker>(
-    `INSERT INTO trackers (user_id, name, weekly_limit, unit, reset_dow, reset_hour, active_days, reserve_pct)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${TRACKER_COLS}`,
-    [user.id, t.name, t.weekly_limit, t.unit, t.reset_dow, t.reset_hour, t.active_days, t.reserve_pct],
+    `INSERT INTO trackers (user_id, name, weekly_limit, unit, reset_dow, reset_hour, active_days, reserve_pct, mascot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${TRACKER_COLS}`,
+    [user.id, t.name, t.weekly_limit, t.unit, t.reset_dow, t.reset_hour, t.active_days, t.reserve_pct, t.mascot],
   );
   return json(row, 201);
 }
