@@ -32,6 +32,31 @@ npm run dev                  # http://localhost:3000
 | `DATABASE_URL` | Postgres connection string (จำเป็น, หรือใช้ `POSTGRES_URL` แทนได้) |
 | `PGSSL=require` | บังคับ SSL แบบไม่ verify cert (ใช้เมื่อ provider ไม่รองรับ `?sslmode=require`) |
 | `PG_POOL_MAX` | จำนวน connection สูงสุดต่อ instance (ค่าเริ่มต้น 5) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | เปิดปุ่ม "ดำเนินการต่อด้วย Google" (ไม่บังคับ) |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | เปิดปุ่ม "ดำเนินการต่อด้วย GitHub" (ไม่บังคับ) |
+| `APP_URL` | URL หลักของแอป ใช้สร้าง redirect URI (ไม่ตั้งก็ใช้ origin ของ request) |
+
+## เข้าสู่ระบบด้วย Google / GitHub
+
+ใช้ OAuth flow เล็ก ๆ ผ่านไลบรารี [`arctic`](https://arcticjs.dev) แล้วออก session cookie แบบเดียวกับการ login ด้วยรหัสผ่าน
+บัญชี OAuth เก็บในตาราง `accounts` และผูกกับแถวใน `users` (ผู้ใช้ OAuth ไม่มีรหัสผ่าน) — ตั้งเฉพาะ provider ที่ต้องการ ปุ่มจะขึ้นเองเมื่อมี env ครบ
+
+Redirect URI (ลงทะเบียนทั้งของเครื่องและของ Vercel):
+
+```
+http://localhost:3000/api/auth/oauth/google/callback
+https://<โดเมน-vercel>/api/auth/oauth/google/callback
+http://localhost:3000/api/auth/oauth/github/callback
+https://<โดเมน-vercel>/api/auth/oauth/github/callback
+```
+
+- **Google:** [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create credentials → OAuth client ID → *Web application* → ใส่ Authorized redirect URIs ด้านบน
+- **GitHub:** [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers) → New OAuth App → Authorization callback URL
+  (GitHub OAuth App รับได้ callback เดียว — สร้างแยก app สำหรับ local กับ production)
+- ใส่ค่าใน `.env.local` และใน Vercel → Settings → Environment Variables แล้ว redeploy
+
+การผูกบัญชี: ระบบ**ไม่**ผูกด้วยอีเมลอัตโนมัติ (การสมัครด้วยรหัสผ่านไม่ได้ยืนยันอีเมล) — ครั้งแรกที่กด Google/GitHub จะสร้างผู้ใช้ใหม่
+ถ้าต้องการผูกกับบัญชีรหัสผ่านเดิม ให้ login ด้วยรหัสผ่านก่อน แล้วเปิด `/api/auth/oauth/google` (หรือ `github`) บัญชีนั้นจะถูกผูกกับผู้ใช้ที่ login อยู่
 
 ## โครงสร้าง
 
@@ -39,10 +64,12 @@ npm run dev                  # http://localhost:3000
 app/
   page.tsx, login/page.tsx     หน้า dashboard / login (server components ตรวจ session)
   api/auth/*                   register, login, logout (session cookie + scrypt)
+  api/auth/oauth/[provider]/*  เริ่ม/callback ของ Google, GitHub OAuth (arctic)
   api/trackers/*, api/usage/*  CRUD ของ AI ที่ติดตามและการใช้
 components/                    Dashboard, UsageForm, TrackerDialog, WeekChart (client)
 lib/budget.ts                  สูตรคำนวณงบ + คำแนะนำ (ทำใน browser ตาม timezone ผู้ใช้)
 lib/db.ts, lib/auth.ts         Postgres pool, session
+lib/oauth.ts                   OAuth providers + ผูกบัญชี
 db/schema.sql                  schema
 ```
 

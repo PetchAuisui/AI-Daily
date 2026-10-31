@@ -88,6 +88,10 @@ input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -
 .tabs { display: flex; gap: .25rem; background: var(--surface-2); padding: .25rem; border-radius: 10px; margin: 1.25rem 0; }
 .tab { flex: 1; font: inherit; border: 0; background: transparent; padding: .5rem; border-radius: 8px; cursor: pointer; color: var(--muted); }
 .tab.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+.divider { display: flex; align-items: center; gap: .75rem; margin: 1.25rem 0 1rem; color: var(--muted); font-size: .8rem; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.oauth { display: grid; gap: .5rem; }
+.oauth-btn { display: flex; align-items: center; justify-content: center; gap: .6rem; text-decoration: none; color: var(--text); }
 
 /* Layout */
 .topbar {
