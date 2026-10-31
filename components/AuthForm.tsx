@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import Logo from './Logo';
 
 export default function AuthForm() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function AuthForm() {
   return (
     <section className="auth">
       <div className="auth-card">
-        <div className="logo">🤖 AI Daily</div>
+        <div className="logo"><Logo /> AI Daily</div>
         <p className="muted">เพื่อนช่วยแบ่ง weekly token ให้พอใช้ทั้งสัปดาห์</p>
         <div className="tabs" role="tablist">
           {(['login', 'register'] as const).map((m) => (

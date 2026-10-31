@@ -84,7 +84,8 @@ input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -
   border-radius: 18px; padding: 2rem; box-shadow: var(--shadow);
 }
 .auth-card .logo { font-size: 1.6rem; }
-.logo { font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; }
+.logo { font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; display: inline-flex; align-items: center; gap: .45em; }
+.logo-mark { flex-shrink: 0; }
 .tabs { display: flex; gap: .25rem; background: var(--surface-2); padding: .25rem; border-radius: 10px; margin: 1.25rem 0; }
 .tab { flex: 1; font: inherit; border: 0; background: transparent; padding: .5rem; border-radius: 8px; cursor: pointer; color: var(--muted); }
 .tab.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
