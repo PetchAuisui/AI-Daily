@@ -1,0 +1,17 @@
+import type { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'AI Daily Budget',
+    short_name: 'AI Daily',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#f6f5f1',
+    theme_color: '#1f1d1a',
+    icons: [
+      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+  };
+}
