@@ -11,7 +11,8 @@ export type Tone = 'ok' | 'warn' | 'over';
 export type Tip = Array<string | { b: string }>;
 export type Advice = { face: string; title: string; tips: Tip[]; tone: Tone };
 
-// สัปดาห์เริ่มที่ reset_dow + reset_hour ล่าสุดที่ผ่านมา, แบ่งเป็น 7 "วันงบ" ยาววันละ 24 ชม.
+// สัปดาห์เริ่มที่ reset_dow + reset_hour ล่าสุดที่ผ่านมา, แบ่งช่วงตามวันในปฏิทิน (ตัดเที่ยงคืน)
+// ถ้ารีเซ็ตไม่ใช่เที่ยงคืน วันรีเซ็ตจะถูกแบ่งเป็น 2 ช่วง: หลังรีเซ็ต (แท่งแรก) และก่อนรีเซ็ต (แท่งสุดท้าย) → 8 แท่ง
 export function weekStartFor(t: Pick<Tracker, 'reset_dow' | 'reset_hour'>, now = new Date()) {
   const d = new Date(now);
   d.setHours(t.reset_hour, 0, 0, 0);
@@ -27,52 +28,64 @@ export function addDays(d: Date, n: number) {
 }
 
 function slicesOf(start: Date): Slice[] {
-  return Array.from({ length: 7 }, (_, i) => ({ start: addDays(start, i), end: addDays(start, i + 1) }));
+  const end = addDays(start, 7);
+  const cuts = [start];
+  const d = new Date(start);
+  d.setHours(0, 0, 0, 0);
+  for (let i = 1; i <= 7; i++) {
+    const midnight = addDays(d, i);
+    if (midnight > start && midnight < end) cuts.push(midnight);
+  }
+  cuts.push(end);
+  return cuts.slice(0, -1).map((s, i) => ({ start: s, end: cuts[i + 1] }));
 }
 
 export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now: Date) {
   const slices = slicesOf(weekStart);
-  const weekEnd = slices[6].end;
+  const n = slices.length;
+  const weekEnd = slices[n - 1].end;
   const active = slices.map((s) => t.active_days[s.start.getDay()] === '1');
+  // น้ำหนักงบของแต่ละช่วง = ความยาวเป็นวัน (ช่วงไม่เต็มวันได้งบตามสัดส่วน), วันพัก = 0
+  const weight = slices.map((s, i) => (active[i] ? (+s.end - +s.start) / DAY_MS : 0));
+  const wSum = (from: number, to = n) => weight.slice(Math.max(0, from), to).reduce((a, b) => a + b, 0);
   const perDay = slices.map((s) => entries.filter((e) => e.ts >= +s.start && e.ts < +s.end).reduce((a, e) => a + e.amount, 0));
 
   const L = t.weekly_limit;
   const reserve = L * (t.reserve_pct / 100);
   const usable = L - reserve;
-  const activeCount = active.filter(Boolean).length;
-  const baseDaily = usable / activeCount;
+  const activeCount = [...t.active_days].filter((c) => c === '1').length;
+  const baseDaily = usable / wSum(0);
   const used = perDay.reduce((a, b) => a + b, 0);
   const remaining = L - used;
 
   const isCurrent = now >= weekStart && now < weekEnd;
-  const todayIdx = isCurrent ? slices.findIndex((s) => now >= s.start && now < s.end) : now >= weekEnd ? 7 : -1;
+  const todayIdx = isCurrent ? slices.findIndex((s) => now >= s.start && now < s.end) : now >= weekEnd ? n : -1;
 
   // แผนงบรายวัน: วันที่ผ่านไปแล้วใช้ baseDaily, วันนี้/อนาคตปรับตามที่เหลือจริง
   const usedBefore = perDay.slice(0, Math.max(0, todayIdx)).reduce((a, b) => a + b, 0);
-  const activeFromToday = active.filter((a, i) => a && i >= todayIdx).length;
   const activeAfterToday = active.filter((a, i) => a && i > todayIdx).length;
-  const usedToday = todayIdx >= 0 && todayIdx < 7 ? perDay[todayIdx] : 0;
-  const todayActive = todayIdx >= 0 && todayIdx < 7 && active[todayIdx];
+  const usedToday = todayIdx >= 0 && todayIdx < n ? perDay[todayIdx] : 0;
+  const todayActive = todayIdx >= 0 && todayIdx < n && active[todayIdx];
 
-  const todayBudget = todayActive ? Math.max(0, usable - usedBefore) / activeFromToday : 0;
-  const nextDaily = activeAfterToday > 0 ? Math.max(0, usable - used) / activeAfterToday : 0;
+  // todayBudget = งบของช่วงวันนี้ทั้งช่วง; nextDaily = งบต่อ "วันเต็ม" สำหรับวันถัดไป
+  const todayBudget = todayActive ? (Math.max(0, usable - usedBefore) * weight[todayIdx]) / wSum(todayIdx) : 0;
+  const nextDaily = activeAfterToday > 0 ? Math.max(0, usable - used) / wSum(todayIdx + 1) : 0;
   const todayFrac = todayActive ? (+now - +slices[todayIdx].start) / (+slices[todayIdx].end - +slices[todayIdx].start) : 0;
 
   // pace: ควรใช้ไปเท่าไหร่แล้ว ณ ตอนนี้ (ตามแผนตั้งต้น)
   let expected = 0;
   if (isCurrent) {
-    for (let i = 0; i < todayIdx; i++) if (active[i]) expected += baseDaily;
-    expected += baseDaily * todayFrac;
-  } else if (todayIdx === 7) expected = usable;
+    expected = baseDaily * (wSum(0, todayIdx) + weight[todayIdx] * todayFrac);
+  } else if (todayIdx === n) expected = usable;
 
   // คาดการณ์วันหมด จากค่าเฉลี่ยต่อวันใช้งานที่ผ่านมา (รวมวันนี้)
   let runOut: Date | null = null;
   if (isCurrent && used > 0 && remaining > 0) {
-    const elapsedActive = active.slice(0, todayIdx).filter(Boolean).length + todayFrac;
+    const elapsedActive = wSum(0, todayIdx) + weight[todayIdx] * todayFrac;
     const rate = elapsedActive > 0 ? used / elapsedActive : 0;
     let left = remaining;
-    for (let i = todayIdx; rate > 0 && i < 7; i++) {
-      const cap = i === todayIdx ? (todayActive ? 1 - todayFrac : 0) : active[i] ? 1 : 0;
+    for (let i = todayIdx; rate > 0 && i < n; i++) {
+      const cap = i === todayIdx ? weight[i] * (1 - todayFrac) : weight[i];
       const burn = rate * cap;
       if (burn > 0 && burn >= left) {
         runOut = new Date(+(i === todayIdx ? now : slices[i].start) + (left / rate) * DAY_MS);
@@ -87,12 +100,12 @@ export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now:
   // งบรายวันสำหรับกราฟ
   const plan = slices.map((_, i) => {
     if (!active[i]) return 0;
-    if (!isCurrent || i < todayIdx) return baseDaily;
-    return i === todayIdx ? todayBudget : nextDaily;
+    if (!isCurrent || i < todayIdx) return baseDaily * weight[i];
+    return i === todayIdx ? todayBudget : nextDaily * weight[i];
   });
 
   return {
-    slices, active, perDay, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
+    slices, active, weight, perDay, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
     isCurrent, todayIdx, usedToday, todayActive, todayBudget, nextDaily, activeAfterToday,
     expected, runOut, hoursLeftToday, weekEnd,
   };
@@ -115,7 +128,7 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
 
   if (!c.isCurrent) {
     const over = c.used > c.L;
-    if (c.todayIdx !== 7) return { face: '🗓️', title: 'สัปดาห์นี้ยังไม่เริ่ม', tips, tone: 'ok' };
+    if (c.todayIdx !== c.slices.length) return { face: '🗓️', title: 'สัปดาห์นี้ยังไม่เริ่ม', tips, tone: 'ok' };
     const heavy = c.perDay.reduce((m, v, i) => (v > c.perDay[m] ? i : m), 0);
     if (c.used > 0) tips.push([`วันที่ใช้หนักสุดคือ ${dateTH(c.slices[heavy].start)} (${fmtU(c.perDay[heavy], u)})`]);
     tips.push([over ? 'สัปดาห์นี้เกินโควต้า ลองเพิ่ม % สำรองหรือลดงานหนักในวันแรกๆ' : 'คุมได้ดีมาก ✌️']);
