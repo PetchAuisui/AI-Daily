@@ -92,7 +92,9 @@ input:focus, select:focus { outline: 2px solid var(--primary); outline-offset: -
 .divider { display: flex; align-items: center; gap: .75rem; margin: 1.25rem 0 1rem; color: var(--muted); font-size: .8rem; }
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .oauth { display: grid; gap: .5rem; }
-.oauth-btn { display: flex; align-items: center; justify-content: center; gap: .6rem; text-decoration: none; color: var(--text); }
+/* a.btn.oauth-btn ให้ชนะ a.btn { display: inline-block } ด้านล่าง */
+a.btn.oauth-btn { display: flex; align-items: center; justify-content: center; gap: .6rem; text-decoration: none; color: var(--text); }
+.oauth-btn svg { flex-shrink: 0; display: block; }
 
 /* Layout */
 .topbar {
