@@ -6,8 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { addDays, buddyAdvice, compute, statusOf, weekStartFor, type Budget, type Tip } from '@/lib/budget';
 import { dateTH, fmt, fmtU, timeTH } from '@/lib/format';
+import { mascotFor } from '@/lib/mascots';
 import type { Tracker, UsageEntry, User } from '@/lib/types';
 import Logo from './Logo';
+import Mascot from './Mascot';
 import TrackerDialog from './TrackerDialog';
 import UsageForm from './UsageForm';
 import WeekChart from './WeekChart';
@@ -85,7 +87,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
       <header className="topbar">
         <div className="logo"><Logo /> AI Daily</div>
         <div className="user">
-          <span>สวัสดี {user.display_name} 👋</span>
+          <span>สวัสดี {user.display_name}</span>
           <Link href="/profile" className="btn ghost sm">โปรไฟล์</Link>
           <button className="btn ghost sm" onClick={logout}>ออกจากระบบ</button>
         </div>
@@ -102,7 +104,9 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
           <>
             <nav className="tracker-tabs">
               {trackers.map((t) => (
-                <button key={t.id} className={t.id === currentId ? 'active' : ''} onClick={() => selectTracker(t.id)}>{t.name}</button>
+                <button key={t.id} className={t.id === currentId ? 'active' : ''} onClick={() => selectTracker(t.id)}>
+                  <Mascot id={mascotFor(t)} size={22} />{t.name}
+                </button>
               ))}
               <button className="add" onClick={() => setDialog({ open: true, tracker: null })}>+ เพิ่ม AI</button>
             </nav>
@@ -170,7 +174,7 @@ function Buddy({ tracker, c }: { tracker: Tracker; c: Budget }) {
   const a = buddyAdvice(tracker, c);
   return (
     <div className={`buddy card ${a.tone}`}>
-      <div className="face">{a.face}</div>
+      <div className="face"><Mascot id={mascotFor(tracker)} mood={a.mood} size={64} /></div>
       <div className="msg">
         <h2>{a.title}</h2>
         {a.tips.length > 0 && <ul>{a.tips.map((t, i) => <TipLine key={i} tip={t} />)}</ul>}

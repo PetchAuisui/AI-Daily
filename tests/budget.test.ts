@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compute, statusOf, weekStartFor } from '@/lib/budget';
+import { buddyAdvice, compute, statusOf, weekStartFor } from '@/lib/budget';
 import type { Tracker, UsageEntry } from '@/lib/types';
 
 // เวลาในเทสต์เป็นเวลาท้องถิ่น (สคริปต์ test ตั้ง TZ=Asia/Bangkok)
@@ -81,5 +81,21 @@ describe('compute: งบรายวัน', () => {
     const c = compute(tracker(), [], at(26, 19), new Date(2026, 10, 3, 9));
     expect(c.isCurrent).toBe(false);
     expect(c.todayIdx).toBe(c.slices.length);
+  });
+});
+
+describe('buddyAdvice: อารมณ์ตัวละคร', () => {
+  const entries = (amount: number) => [use(at(27, 10), amount)];
+  it.each([
+    [1, 'happy'],
+    [13, 'worried'],
+    [30, 'dizzy'],
+  ] as const)('วันนี้ใช้ %d%% → %s', (amount, mood) => {
+    const c = compute(tracker(), entries(amount), at(26, 19), at(27, 23));
+    expect(buddyAdvice(tracker(), c).mood).toBe(mood);
+  });
+  it('วันพัก → sleepy', () => {
+    const c = compute(tracker({ active_days: '1101111' }), [], at(26, 19), at(27, 12));
+    expect(buddyAdvice(tracker({ active_days: '1101111' }), c).mood).toBe('sleepy');
   });
 });
