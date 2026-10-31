@@ -1,5 +1,5 @@
 import type { Budget } from '@/lib/budget';
-import { DOW_TH, dateTH, fmt, fmtU } from '@/lib/format';
+import { DOW_TH, dateTH, fmt, fmtU, timeTH } from '@/lib/format';
 
 const W = 700, H = 230, PL = 44, PR = 12, PT = 14, PB = 40;
 
@@ -7,16 +7,17 @@ const W = 700, H = 230, PL = 44, PR = 12, PT = 14, PB = 40;
 export default function WeekChart({ c, unit }: { c: Budget; unit: string }) {
   const iw = W - PL - PR, ih = H - PT - PB;
   const cum = c.perDay.map((_, i) => c.perDay.slice(0, i + 1).reduce((a, b) => a + b, 0));
-  // เส้น pace: งบตั้งต้นสะสมตามวันใช้งาน จบที่ usable (โควต้าหักสำรอง)
-  const cumPlan = c.active.map((_, i) => c.baseDaily * c.active.slice(0, i + 1).filter(Boolean).length);
+  const n = c.slices.length;
+  // เส้น pace: งบตั้งต้นสะสมตามวันใช้งาน (ช่วงไม่เต็มวันคิดตามสัดส่วน) จบที่ usable
+  const cumPlan = c.weight.map((_, i) => c.baseDaily * c.weight.slice(0, i + 1).reduce((a, b) => a + b, 0));
   // ปกติสุดที่ 100% ของโควต้า; ถ้าใช้เกินก็ขยายทีละ 25%
   const step = c.L / 4;
-  const ticks = Math.max(4, Math.ceil(cum[6] / step));
+  const ticks = Math.max(4, Math.ceil(cum[n - 1] / step));
   const max = step * ticks;
   const y = (v: number) => PT + ih - (v / max) * ih;
-  const bw = iw / 7;
+  const bw = iw / n;
   const barW = bw * 0.56;
-  const shown = c.isCurrent ? c.todayIdx : c.todayIdx === 7 ? 6 : -1; // วันสุดท้ายที่มีข้อมูลจริง
+  const shown = c.isCurrent ? c.todayIdx : c.todayIdx === n ? n - 1 : -1; // วันสุดท้ายที่มีข้อมูลจริง
 
   return (
     <div className="chart">
@@ -36,6 +37,11 @@ export default function WeekChart({ c, unit }: { c: Budget; unit: string }) {
           const isToday = c.isCurrent && i === c.todayIdx;
           const bx = x + (bw - barW) / 2;
           const future = i > shown;
+          // ช่วงไม่เต็มวัน (วันรีเซ็ต) แสดงเวลาที่ตัด เช่น "19:00–" / "–19:00"
+          const sub = isToday ? 'วันนี้'
+            : s.start.getHours() || s.start.getMinutes() ? `${timeTH(s.start)}–`
+            : s.end.getHours() || s.end.getMinutes() ? `–${timeTH(s.end)}`
+            : c.active[i] ? '' : 'พัก';
           return (
             <g key={i}>
               {isToday && <rect x={x + 2} y={PT} width={bw - 4} height={ih} rx={8} fill="var(--surface-2)" />}
@@ -59,7 +65,7 @@ export default function WeekChart({ c, unit }: { c: Budget; unit: string }) {
               <text x={x + bw / 2} y={H - PB + 18} textAnchor="middle" className={isToday ? 'today-label' : undefined}>
                 {DOW_TH[s.start.getDay()]} {s.start.getDate()}
               </text>
-              <text x={x + bw / 2} y={H - PB + 33} textAnchor="middle">{isToday ? 'วันนี้' : c.active[i] ? '' : 'พัก'}</text>
+              <text x={x + bw / 2} y={H - PB + 33} textAnchor="middle">{sub}</text>
             </g>
           );
         })}

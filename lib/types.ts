@@ -13,6 +13,7 @@ export type Tracker = {
   reset_hour: number;
   active_days: string; // 7 ตัว '0'/'1' ตาม index ของ getDay()
   reserve_pct: number;
+  mascot: string | null; // id จาก lib/mascots.ts, null = อัตโนมัติ
 };
 
 export type TrackerInput = Omit<Tracker, 'id'>;
