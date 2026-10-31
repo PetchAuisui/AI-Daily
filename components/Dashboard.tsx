@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -85,6 +86,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
         <div className="logo"><Logo /> AI Daily</div>
         <div className="user">
           <span>สวัสดี {user.display_name} 👋</span>
+          <Link href="/profile" className="btn ghost sm">โปรไฟล์</Link>
           <button className="btn ghost sm" onClick={logout}>ออกจากระบบ</button>
         </div>
       </header>
