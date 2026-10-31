@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { addDays, buddyAdvice, compute, statusOf, weekStartFor, type Budget, type Tip } from '@/lib/budget';
 import { dateTH, fmt, fmtU, timeTH } from '@/lib/format';
 import type { Tracker, UsageEntry, User } from '@/lib/types';
+import Logo from './Logo';
 import TrackerDialog from './TrackerDialog';
 import UsageForm from './UsageForm';
 import WeekChart from './WeekChart';
@@ -81,7 +82,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
   return (
     <section>
       <header className="topbar">
-        <div className="logo">🤖 AI Daily</div>
+        <div className="logo"><Logo /> AI Daily</div>
         <div className="user">
           <span>สวัสดี {user.display_name} 👋</span>
           <button className="btn ghost sm" onClick={logout}>ออกจากระบบ</button>
