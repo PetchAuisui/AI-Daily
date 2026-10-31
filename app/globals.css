@@ -120,7 +120,9 @@ a.btn.oauth-btn { display: flex; align-items: center; justify-content: center; g
 .tracker-tabs button {
   font: inherit; white-space: nowrap; cursor: pointer; padding: .45rem .9rem; border-radius: 999px;
   border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  display: inline-flex; align-items: center; gap: .4rem;
 }
+.tracker-tabs button svg { display: block; flex-shrink: 0; margin-left: -.35rem; }
 .tracker-tabs button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 .tracker-tabs button.add { border-style: dashed; color: var(--muted); }
 
@@ -129,7 +131,8 @@ a.btn.oauth-btn { display: flex; align-items: center; justify-content: center; g
 
 /* Buddy */
 .buddy { display: flex; gap: 1rem; align-items: flex-start; }
-.buddy .face { font-size: 2.2rem; line-height: 1; }
+.buddy .face { flex-shrink: 0; line-height: 0; }
+.buddy .face svg { display: block; }
 .buddy .msg h2 { font-size: 1.1rem; margin-bottom: .35rem; }
 .buddy ul { margin: .4rem 0 0; padding-left: 1.1rem; }
 .buddy li { margin: .2rem 0; }

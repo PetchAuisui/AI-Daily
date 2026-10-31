@@ -1,5 +1,6 @@
 // การคำนวณงบรายวัน — ทำฝั่ง browser ตาม timezone ของผู้ใช้
 import { dateTH, fmtU, timeTH } from './format';
+import type { Mood } from './mascots';
 import type { Tracker, UsageEntry } from './types';
 
 const DAY_MS = 864e5;
@@ -9,7 +10,8 @@ export type Status = 'ok' | 'warn' | 'over' | 'off';
 export type Tone = 'ok' | 'warn' | 'over';
 /** ข้อความคำแนะนำ: string ธรรมดา หรือ { b } = ตัวหนา */
 export type Tip = Array<string | { b: string }>;
-export type Advice = { face: string; title: string; tips: Tip[]; tone: Tone };
+/** mood = อารมณ์ของตัวละครประจำ AI ที่แสดงคู่กับคำแนะนำ */
+export type Advice = { mood: Mood; title: string; tips: Tip[]; tone: Tone };
 
 // สัปดาห์เริ่มที่ reset_dow + reset_hour ล่าสุดที่ผ่านมา, แบ่งช่วงตามวันในปฏิทิน (ตัดเที่ยงคืน)
 // ถ้ารีเซ็ตไม่ใช่เที่ยงคืน วันรีเซ็ตจะถูกแบ่งเป็น 2 ช่วง: หลังรีเซ็ต (แท่งแรก) และก่อนรีเซ็ต (แท่งสุดท้าย) → 8 แท่ง
@@ -128,12 +130,12 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
 
   if (!c.isCurrent) {
     const over = c.used > c.L;
-    if (c.todayIdx !== c.slices.length) return { face: '🗓️', title: 'สัปดาห์นี้ยังไม่เริ่ม', tips, tone: 'ok' };
+    if (c.todayIdx !== c.slices.length) return { mood: 'sleepy', title: 'สัปดาห์นี้ยังไม่เริ่ม', tips, tone: 'ok' };
     const heavy = c.perDay.reduce((m, v, i) => (v > c.perDay[m] ? i : m), 0);
     if (c.used > 0) tips.push([`วันที่ใช้หนักสุดคือ ${dateTH(c.slices[heavy].start)} (${fmtU(c.perDay[heavy], u)})`]);
     tips.push([over ? 'สัปดาห์นี้เกินโควต้า ลองเพิ่ม % สำรองหรือลดงานหนักในวันแรกๆ' : 'คุมได้ดีมาก ✌️']);
     return {
-      face: over ? '😵' : '🎉',
+      mood: over ? 'dizzy' : 'happy',
       title: `สัปดาห์นี้ใช้ไป ${fmtU(c.used, u)} จาก ${fmtU(c.L, u)} (${Math.round((c.used / c.L) * 100)}%)`,
       tips,
       tone: over ? 'over' : 'ok',
@@ -141,21 +143,21 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
   }
 
   const st = statusOf(c);
-  let face: string, title: string, tone: Tone;
+  let mood: Mood, title: string, tone: Tone;
   const leftToday = c.todayBudget - c.usedToday;
 
   if (c.remaining <= 0) {
-    face = '😵'; tone = 'over';
+    mood = 'dizzy'; tone = 'over';
     title = 'โควต้าสัปดาห์นี้หมดแล้ว';
     tips.push([`รีเซ็ตรอบถัดไป ${dateTH(c.weekEnd)} ${timeTH(c.weekEnd)}`]);
     tips.push(['ระหว่างนี้ใช้ AI ตัวอื่นหรือรุ่นที่เล็กกว่าไปก่อน']);
   } else if (st === 'off') {
-    face = '😴'; tone = 'ok';
+    mood = 'sleepy'; tone = 'ok';
     title = 'วันนี้เป็นวันพัก ไม่ได้แบ่งงบไว้';
     if (c.usedToday > 0) tips.push([`วันพักแต่ใช้ไป ${fmtU(c.usedToday, u)} — หักจากงบวันถัดไปแล้ว`]);
     tips.push([`วันใช้งานถัดไปมีงบ ~${fmtU(c.nextDaily, u)}/วัน`]);
   } else if (st === 'over') {
-    face = '🔥'; tone = 'over';
+    mood = 'dizzy'; tone = 'over';
     title = `วันนี้ใช้หนักไปแล้ว เกินงบ ${fmtU(-leftToday, u)}`;
     if (c.activeAfterToday > 0) {
       tips.push([`ถ้าหยุดตอนนี้ วันที่เหลือ (${c.activeAfterToday} วัน) ใช้ได้ ~`, { b: `${fmtU(c.nextDaily, u)}/วัน` }, ` (ปกติ ${fmtU(c.baseDaily, u)})`]);
@@ -165,12 +167,12 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
     if (c.used > c.usable) tips.push([`เริ่มกินส่วนสำรองแล้ว (สำรองเหลือ ${fmtU(Math.max(0, c.remaining), u)})`]);
     tips.push(['ลดการใช้: เปิดแชทใหม่แทนแชทยาว, ใช้รุ่นเล็กกับงานง่าย, สรุปบริบทก่อนส่ง, หลีกเลี่ยงแนบไฟล์ใหญ่ซ้ำ']);
   } else if (st === 'warn') {
-    face = '😬'; tone = 'warn';
+    mood = 'worried'; tone = 'warn';
     title = `ใกล้ครบงบวันนี้แล้ว เหลืออีก ${fmtU(leftToday, u)}`;
     if (c.hoursLeftToday > 0.5) tips.push([`เหลือเวลาอีก ${c.hoursLeftToday.toFixed(1)} ชม. → ~${fmtU(leftToday / c.hoursLeftToday, u)}/ชม.`]);
     tips.push(['เก็บงานหนักไว้พรุ่งนี้ วันนี้ใช้กับงานสั้นๆ พอ']);
   } else {
-    face = '😊'; tone = 'ok';
+    mood = 'happy'; tone = 'ok';
     title = `วันนี้ใช้ได้อีก ${fmtU(leftToday, u)} สบายๆ`;
     if (c.hoursLeftToday > 0.5) tips.push([`เหลือเวลาอีก ${c.hoursLeftToday.toFixed(1)} ชม. → ใช้ได้ ~${fmtU(leftToday / c.hoursLeftToday, u)}/ชม.`]);
   }
@@ -181,8 +183,8 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
     else if (diffPace < -c.baseDaily * 0.5) tips.push([`ช้ากว่าแผน ${fmtU(-diffPace, u)} — มีเหลือเฟือ ใช้งานหนักได้ถ้าจำเป็น`]);
     if (c.runOut && c.runOut < c.weekEnd) {
       tips.push(['⚠️ ถ้าใช้เรทนี้ต่อ จะหมดประมาณ ', { b: `${dateTH(c.runOut)} ${timeTH(c.runOut)}` }, ' (ก่อนรีเซ็ต)']);
-      if (tone === 'ok') tone = 'warn';
+      if (tone === 'ok') { tone = 'warn'; mood = 'worried'; }
     }
   }
-  return { face, title, tips, tone };
+  return { mood, title, tips, tone };
 }
