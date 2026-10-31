@@ -5,7 +5,7 @@ import type { Tracker, UsageEntry } from '@/lib/types';
 // เวลาในเทสต์เป็นเวลาท้องถิ่น (สคริปต์ test ตั้ง TZ=Asia/Bangkok)
 const tracker = (o: Partial<Tracker> = {}): Tracker => ({
   id: 1, name: 'Claude', weekly_limit: 100, unit: '%', reset_dow: 1, reset_hour: 19,
-  active_days: '1111111', reserve_pct: 10, ...o,
+  active_days: '1111111', reserve_pct: 10, mascot: null, ...o,
 });
 let nextId = 1;
 const use = (d: Date, amount: number): UsageEntry => ({ id: nextId++, tracker_id: 1, ts: +d, amount, note: '' });
