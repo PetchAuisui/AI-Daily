@@ -118,18 +118,15 @@ export default function TrackerDialog({ open, tracker, onClose, onSaved }: Props
   );
 }
 
-function MascotPicker({ value, auto, onChange }: { value: string | null; auto: string; onChange: (m: string | null) => void }) {
+// ยังไม่เคยเลือก (mascot = null) → ไฮไลต์ตัวที่สุ่มจากชื่อไว้ ซึ่งเป็นตัวเดียวกับที่แสดงอยู่
+function MascotPicker({ value, auto, onChange }: { value: string | null; auto: string; onChange: (m: string) => void }) {
   const { species, color } = parseMascot(value ?? auto);
   return (
     <fieldset className="mascot-picker">
       <legend>ตัวละครประจำ AI</legend>
       <div className="mascot-row">
-        <button type="button" className={`mascot-opt${value == null ? ' on' : ''}`} title="เลือกให้อัตโนมัติจากชื่อ" onClick={() => onChange(null)}>
-          <Mascot id={auto} size={40} />
-          <span>อัตโนมัติ</span>
-        </button>
         {SPECIES.map((s) => (
-          <button type="button" key={s} className={`mascot-opt${value != null && s === species ? ' on' : ''}`} title={SPECIES_TH[s]}
+          <button type="button" key={s} className={`mascot-opt${s === species ? ' on' : ''}`} title={SPECIES_TH[s]}
             onClick={() => onChange(`${s}-${color}`)}>
             <Mascot id={`${s}-${color}`} size={40} />
             <span>{SPECIES_TH[s]}</span>
@@ -139,7 +136,7 @@ function MascotPicker({ value, auto, onChange }: { value: string | null; auto: s
       <div className="swatches">
         {COLORS.map((c) => (
           <button type="button" key={c} title={COLOR_TH[c]} aria-label={`สี${COLOR_TH[c]}`} style={{ background: PALETTE[c].body }}
-            className={value != null && c === color ? 'on' : ''} onClick={() => onChange(`${species}-${c}`)} />
+            className={c === color ? 'on' : ''} onClick={() => onChange(`${species}-${c}`)} />
         ))}
       </div>
     </fieldset>
