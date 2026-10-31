@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { DOW_TH, DOW_TH_FULL } from '@/lib/format';
+import { COLORS, COLOR_TH, PALETTE, SPECIES, SPECIES_TH, mascotFor, parseMascot } from '@/lib/mascots';
 import type { Tracker, TrackerInput } from '@/lib/types';
+import Mascot from './Mascot';
 
 type Props = {
   open: boolean;
@@ -16,7 +18,7 @@ const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // แสดง จ–อา
 
 function defaults(): TrackerInput {
   const now = new Date();
-  return { name: '', weekly_limit: 100, unit: '%', reset_dow: now.getDay(), reset_hour: now.getHours(), active_days: '1111111', reserve_pct: 10 };
+  return { name: '', weekly_limit: 100, unit: '%', reset_dow: now.getDay(), reset_hour: now.getHours(), active_days: '1111111', reserve_pct: 10, mascot: null };
 }
 
 export default function TrackerDialog({ open, tracker, onClose, onSaved }: Props) {
@@ -100,6 +102,7 @@ export default function TrackerDialog({ open, tracker, onClose, onSaved }: Props
             ))}
           </div>
         </fieldset>
+        <MascotPicker value={v.mascot} auto={mascotFor({ id: tracker?.id, name: v.name })} onChange={(m) => set('mascot', m)} />
         <label>กันสำรองไว้ (%) <span className="muted sm">— เผื่อวันฉุกเฉิน ไม่นำมาแบ่งรายวัน</span>
           <input type="number" min="0" max="89" step="1" required value={v.reserve_pct} onChange={(e) => set('reserve_pct', Number(e.target.value))} />
         </label>
@@ -112,5 +115,33 @@ export default function TrackerDialog({ open, tracker, onClose, onSaved }: Props
         </div>
       </form>
     </dialog>
+  );
+}
+
+function MascotPicker({ value, auto, onChange }: { value: string | null; auto: string; onChange: (m: string | null) => void }) {
+  const { species, color } = parseMascot(value ?? auto);
+  return (
+    <fieldset className="mascot-picker">
+      <legend>ตัวละครประจำ AI</legend>
+      <div className="mascot-row">
+        <button type="button" className={`mascot-opt${value == null ? ' on' : ''}`} title="เลือกให้อัตโนมัติจากชื่อ" onClick={() => onChange(null)}>
+          <Mascot id={auto} size={40} />
+          <span>อัตโนมัติ</span>
+        </button>
+        {SPECIES.map((s) => (
+          <button type="button" key={s} className={`mascot-opt${value != null && s === species ? ' on' : ''}`} title={SPECIES_TH[s]}
+            onClick={() => onChange(`${s}-${color}`)}>
+            <Mascot id={`${s}-${color}`} size={40} />
+            <span>{SPECIES_TH[s]}</span>
+          </button>
+        ))}
+      </div>
+      <div className="swatches">
+        {COLORS.map((c) => (
+          <button type="button" key={c} title={COLOR_TH[c]} aria-label={`สี${COLOR_TH[c]}`} style={{ background: PALETTE[c].body }}
+            className={value != null && c === color ? 'on' : ''} onClick={() => onChange(`${species}-${c}`)} />
+        ))}
+      </div>
+    </fieldset>
   );
 }
