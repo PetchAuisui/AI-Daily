@@ -126,3 +126,33 @@ describe('compute: ระดับการใช้รายวัน (loads)',
     expect(c.weight[6]).toBe(0);
   });
 });
+
+describe('compute: หนักมาก ใช้ได้รอบละครั้ง และล็อกเมื่อใช้หนักจริง', () => {
+  const t = tracker({ reset_hour: 0 }); // 7 วันเต็ม, usable 90
+
+  it('เลือกหนักมากแต่ยังใช้ไม่เกินงบปกติ → ยังไม่ล็อก', () => {
+    const c = compute(t, [use(at(28, 9), 10)], at(26, 0), at(28, 10), { '2026-10-28': 2 });
+    expect(c.heavyAt[2]).toBeCloseTo(90 / 5); // งบวันปกติจาก พ.–อา. (5 วัน)
+    expect(c.heavyUsedIdx).toBe(-1);
+    expect(c.load[2]).toBe(2);
+  });
+
+  it('ใช้เกินงบวันปกติ → นับเป็นหนักมากจริง (ล็อก)', () => {
+    const c = compute(t, [use(at(28, 9), 20)], at(26, 0), at(28, 10), { '2026-10-28': 2 });
+    expect(c.heavyUsedIdx).toBe(2);
+  });
+
+  it('วันที่ผ่านไปที่เลือกหนักมากแต่ไม่ได้ใช้หนัก → กลับเป็นปกติ และคืนสิทธิ์', () => {
+    const c = compute(t, [use(at(27, 9), 5)], at(26, 0), at(28, 10), { '2026-10-27': 2 });
+    expect(c.load[1]).toBe(1);
+    expect(c.heavyUsedIdx).toBe(-1);
+    expect(c.baseDaily).toBeCloseTo(90 / 7);
+  });
+
+  it('วันที่ผ่านไปที่ใช้หนักจริง → ยังได้น้ำหนัก ×2 และหมดสิทธิ์', () => {
+    const c = compute(t, [use(at(27, 9), 30)], at(26, 0), at(28, 10), { '2026-10-27': 2 });
+    expect(c.load[1]).toBe(2);
+    expect(c.heavyUsedIdx).toBe(1);
+    expect(c.baseDaily).toBeCloseTo(90 / 8);
+  });
+});

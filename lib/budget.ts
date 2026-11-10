@@ -30,6 +30,8 @@ export const LOAD_LEVELS = [
   { factor: 1.5, label: 'ใช้มาก' },
   { factor: 2, label: 'หนักมาก' },
 ] as const;
+/** ตัวคูณ "หนักมาก" — ใช้ได้รอบละครั้ง */
+export const HEAVY = 2;
 export const isLoadFactor = (f: number) => LOAD_LEVELS.some((l) => l.factor === f);
 /** วันที่ตามเวลาท้องถิ่น 'YYYY-MM-DD' — ใช้เป็น key ของ day_loads */
 export function dayKey(d: Date) {
@@ -63,26 +65,43 @@ export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now:
   const n = slices.length;
   const weekEnd = slices[n - 1].end;
   const active = slices.map((s) => t.active_days[s.start.getDay()] === '1');
-  // ตัวคูณที่ผู้ใช้ตั้ง (วันนี้ใช้น้อย/มาก) — งบส่วนที่เพิ่ม/ลดจะเกลี่ยไปวันอื่นในรอบ
-  const load = slices.map((s) => loads[dayKey(s.start)] ?? 1);
-  // น้ำหนักงบของแต่ละช่วง = ความยาวเป็นวัน × ตัวคูณ (ช่วงไม่เต็มวันได้งบตามสัดส่วน), วันพัก = 0
-  const weight = slices.map((s, i) => (active[i] ? ((+s.end - +s.start) / DAY_MS) * load[i] : 0));
-  const wSum = (from: number, to = n) => weight.slice(Math.max(0, from), to).reduce((a, b) => a + b, 0);
   const perDay = slices.map((s) => entries.filter((e) => e.ts >= +s.start && e.ts < +s.end).reduce((a, e) => a + e.amount, 0));
+  const len = slices.map((s) => (+s.end - +s.start) / DAY_MS);
 
   const L = t.weekly_limit;
   const reserve = L * (t.reserve_pct / 100);
   const usable = L - reserve;
   const activeCount = [...t.active_days].filter((c) => c === '1').length;
-  const baseDaily = usable / wSum(0);
   const used = perDay.reduce((a, b) => a + b, 0);
   const remaining = L - used;
 
   const isCurrent = now >= weekStart && now < weekEnd;
   const todayIdx = isCurrent ? slices.findIndex((s) => now >= s.start && now < s.end) : now >= weekEnd ? n : -1;
+  const before = (i: number) => perDay.slice(0, i).reduce((a, b) => a + b, 0);
 
-  // แผนงบรายวัน: วันที่ผ่านไปแล้วใช้ baseDaily, วันนี้/อนาคตปรับตามที่เหลือจริง
-  const usedBefore = perDay.slice(0, Math.max(0, todayIdx)).reduce((a, b) => a + b, 0);
+  // ตัวคูณที่ผู้ใช้ตั้ง (วันนี้ใช้น้อย/มาก) — งบส่วนที่เพิ่ม/ลดจะเกลี่ยไปวันอื่นในรอบ
+  const asked = slices.map((s) => loads[dayKey(s.start)] ?? 1);
+  const weightsOf = (ld: number[]) => ld.map((f, i) => (active[i] ? len[i] * f : 0));
+  const sumFrom = (w: number[], from: number) => w.slice(Math.max(0, from)).reduce((a, b) => a + b, 0);
+
+  // "หนักมาก" นับเมื่อวันนั้นใช้เกินงบที่จะได้ถ้าเป็นวันปกติ (heavyAt) — ถึงตอนนั้นจึงล็อกและเสียสิทธิ์ของรอบ
+  // วันที่ผ่านไปแล้วแต่ไม่ได้ใช้หนักจริง → คิดเป็นวันปกติ และคืนสิทธิ์
+  const heavyAt = slices.map((_, i) => {
+    if (asked[i] !== HEAVY || !active[i]) return Infinity;
+    const w = weightsOf(asked.map((f, j) => (j === i ? 1 : f)));
+    const fromToday = isCurrent && i === todayIdx;
+    return fromToday ? (Math.max(0, usable - before(i)) * w[i]) / sumFrom(w, i) : (usable * w[i]) / sumFrom(w, 0);
+  });
+  const heavyReal = perDay.map((v, i) => v > heavyAt[i] + 1e-9);
+  const load = asked.map((f, i) => (f === HEAVY && !heavyReal[i] && (todayIdx === n || i < todayIdx) ? 1 : f));
+  const heavyUsedIdx = heavyReal.findIndex(Boolean);
+
+  // น้ำหนักงบของแต่ละช่วง = ความยาวเป็นวัน × ตัวคูณ (ช่วงไม่เต็มวันได้งบตามสัดส่วน), วันพัก = 0
+  const weight = weightsOf(load);
+  const wSum = (from: number, to = n) => weight.slice(Math.max(0, from), to).reduce((a, b) => a + b, 0);
+  const baseDaily = usable / wSum(0);
+
+  const usedBefore = before(Math.max(0, todayIdx));
   const activeAfterToday = active.filter((a, i) => a && i > todayIdx).length;
   const usedToday = todayIdx >= 0 && todayIdx < n ? perDay[todayIdx] : 0;
   const todayActive = todayIdx >= 0 && todayIdx < n && active[todayIdx];
@@ -125,7 +144,7 @@ export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now:
   });
 
   return {
-    slices, active, load, weight, perDay, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
+    slices, active, load, weight, perDay, heavyAt, heavyUsedIdx, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
     isCurrent, todayIdx, usedToday, todayActive, todayBudget, nextDaily, activeAfterToday,
     expected, runOut, hoursLeftToday, weekEnd,
   };

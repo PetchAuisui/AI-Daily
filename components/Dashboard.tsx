@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { LOAD_LEVELS, addDays, buddyAdvice, compute, dayKey, statusOf, weekStartFor, type Budget, type DayLoads, type Tip } from '@/lib/budget';
+import { HEAVY, LOAD_LEVELS, addDays, buddyAdvice, compute, dayKey, statusOf, weekStartFor, type Budget, type DayLoads, type Tip } from '@/lib/budget';
 import { dateTH, fmt, fmtU, timeTH } from '@/lib/format';
 import { mascotFor } from '@/lib/mascots';
 import type { Tracker, UsageEntry, User } from '@/lib/types';
@@ -243,21 +243,7 @@ function Today({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (d
             {c.usedToday > c.todayBudget && c.todayBudget > 0 && <i className="mark" style={{ left: `${(c.todayBudget / meterMax) * 100}%` }} />}
           </div>
           <div className="muted sm">{c.todayActive ? `ใช้ไป ${Math.round(ratio * 100)}% ของงบวันนี้` : 'วันนี้ไม่ได้อยู่ในวันใช้งาน'}</div>
-          {c.todayActive && (
-            <div className="load-pick">
-              <span className="muted sm">วันนี้จะใช้</span>
-              <div className="seg" role="radiogroup" aria-label="ระดับการใช้วันนี้">
-                {LOAD_LEVELS.map((l) => (
-                  <button key={l.factor} type="button" role="radio" aria-checked={c.load[c.todayIdx] === l.factor}
-                    className={c.load[c.todayIdx] === l.factor ? 'active' : ''}
-                    title={l.factor === 1 ? 'งบตามปกติ' : `งบวันนี้ ×${l.factor} แล้วเกลี่ยส่วนต่างไปวันอื่น`}
-                    onClick={() => onLoad(dayKey(c.slices[c.todayIdx].start), l.factor)}>
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {c.todayActive && <LoadPicker tracker={tracker} c={c} onLoad={onLoad} />}
           <dl className="kv">
             <dt>งบวันนี้ (ปรับตามที่เหลือจริง)</dt><dd>{fmtU(c.todayBudget, u)}</dd>
             <dt>เหลือใช้ได้วันนี้</dt><dd>{fmtU(Math.max(0, c.todayBudget - c.usedToday), u)}</dd>
@@ -268,6 +254,42 @@ function Today({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (d
       ) : (
         <p className="muted">กำลังดูสัปดาห์ย้อนหลัง — สรุปอยู่ด้านบนและกราฟด้านล่าง</p>
       )}
+    </div>
+  );
+}
+
+function LoadPicker({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (day: string, factor: number) => void }) {
+  const i = c.todayIdx;
+  const cur = c.load[i];
+  // ใช้หนักจริงแล้ววันนี้ → ล็อก, เคยใช้หนักจริงวันอื่นในรอบนี้ → หมดสิทธิ์หนักมาก
+  const locked = c.heavyUsedIdx === i;
+  const heavyGone = c.heavyUsedIdx >= 0 && !locked;
+  const titleOf = (f: number) =>
+    locked ? 'ล็อกแล้ว — วันนี้ใช้หนักมากจริงแล้ว'
+    : f === HEAVY && heavyGone ? `ใช้สิทธิ์หนักมากของรอบนี้ไปแล้ว (${dateTH(c.slices[c.heavyUsedIdx].start)})`
+    : f === 1 ? 'งบตามปกติ'
+    : `งบวันนี้ ×${f} แล้วเกลี่ยส่วนต่างไปวันอื่น`;
+  return (
+    <div className="load-pick">
+      <div className="row">
+        <span className="muted sm">วันนี้จะใช้</span>
+        <div className="seg" role="radiogroup" aria-label="ระดับการใช้วันนี้">
+          {LOAD_LEVELS.map((l) => (
+            <button key={l.factor} type="button" role="radio" aria-checked={cur === l.factor}
+              className={cur === l.factor ? 'active' : ''} title={titleOf(l.factor)}
+              disabled={locked || (l.factor === HEAVY && heavyGone)}
+              onClick={() => onLoad(dayKey(c.slices[i].start), l.factor)}>
+              {locked && cur === l.factor ? '🔒 ' : ''}{l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="muted sm hint">
+        {locked ? 'ล็อกแล้ว — วันนี้ใช้หนักจริง นับเป็นสิทธิ์หนักมากของรอบนี้'
+          : cur === HEAVY ? `หนักมากใช้ได้รอบละครั้ง — จะนับและล็อกเมื่อใช้เกิน ${fmtU(c.heavyAt[i], tracker.unit)} (ตอนนี้ยังเปลี่ยนได้)`
+          : heavyGone ? `ใช้สิทธิ์หนักมากของรอบนี้ไปแล้ว (${dateTH(c.slices[c.heavyUsedIdx].start)})`
+          : 'หนักมากใช้ได้รอบละครั้ง'}
+      </div>
     </div>
   );
 }
