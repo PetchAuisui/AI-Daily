@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { addDays, buddyAdvice, compute, statusOf, weekStartFor, type Budget, type Tip } from '@/lib/budget';
+import { HEAVY, LOAD_LEVELS, addDays, buddyAdvice, compute, dayKey, statusOf, weekStartFor, type Budget, type DayLoads, type Tip } from '@/lib/budget';
 import { dateTH, fmt, fmtU, timeTH } from '@/lib/format';
 import { mascotFor } from '@/lib/mascots';
 import type { Tracker, UsageEntry, User } from '@/lib/types';
@@ -27,6 +27,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
   const [currentId, setCurrentId] = useState<number | null>(initialTrackers[0]?.id ?? null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [entries, setEntries] = useState<UsageEntry[]>([]);
+  const [loads, setLoads] = useState<DayLoads>({});
   // now = null จนกว่าจะ mount เพื่อเลี่ยง hydration mismatch (เวลา server ≠ browser)
   const [now, setNow] = useState<Date | null>(null);
   const [dialog, setDialog] = useState<{ open: boolean; tracker: Tracker | null }>({ open: false, tracker: null });
@@ -55,6 +56,26 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
+  const loadLoads = useCallback(async () => {
+    if (trackerId == null || weekStartMs == null) return setLoads({});
+    const from = dayKey(new Date(weekStartMs));
+    const to = dayKey(addDays(new Date(weekStartMs), 7));
+    setLoads(await api<DayLoads>(`/api/trackers/${trackerId}/loads?from=${from}&to=${to}`));
+  }, [trackerId, weekStartMs]);
+
+  useEffect(() => { loadLoads(); }, [loadLoads]);
+
+  async function setDayLoad(day: string, factor: number) {
+    if (trackerId == null) return;
+    setLoads((l) => ({ ...l, [day]: factor })); // อัปเดตทันที แล้วค่อยยืนยันกับ server
+    try {
+      await api(`/api/trackers/${trackerId}/loads`, { method: 'PUT', body: { day, factor } });
+    } catch (e) {
+      alert((e as Error).message);
+    }
+    loadLoads();
+  }
+
   function selectTracker(id: number | null) {
     setCurrentId(id);
     setWeekOffset(0);
@@ -80,7 +101,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
     loadEntries();
   }
 
-  const c = tracker && weekStart && now ? compute(tracker, entries, weekStart, now) : null;
+  const c = tracker && weekStart && now ? compute(tracker, entries, weekStart, now, loads) : null;
 
   return (
     <section>
@@ -127,7 +148,7 @@ export default function Dashboard({ user, initialTrackers, isNew }: Props) {
                 <Stats tracker={tracker} c={c} />
 
                 <div className="grid-2">
-                  <Today tracker={tracker} c={c} />
+                  <Today tracker={tracker} c={c} onLoad={setDayLoad} />
                   <div className="card">
                     <div className="card-head"><h3>บันทึกการใช้</h3></div>
                     <UsageForm tracker={tracker} onSaved={loadEntries} />
@@ -203,7 +224,7 @@ function Stats({ tracker, c }: { tracker: Tracker; c: Budget }) {
 
 const BADGE: Record<string, string> = { ok: 'สบาย', warn: 'ใกล้ครบ', over: 'เกินงบ' };
 
-function Today({ tracker, c }: { tracker: Tracker; c: Budget }) {
+function Today({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (day: string, factor: number) => void }) {
   const u = tracker.unit;
   const st = c.isCurrent ? statusOf(c) : 'off';
   const meterMax = Math.max(c.todayBudget, c.usedToday) || 1;
@@ -222,6 +243,7 @@ function Today({ tracker, c }: { tracker: Tracker; c: Budget }) {
             {c.usedToday > c.todayBudget && c.todayBudget > 0 && <i className="mark" style={{ left: `${(c.todayBudget / meterMax) * 100}%` }} />}
           </div>
           <div className="muted sm">{c.todayActive ? `ใช้ไป ${Math.round(ratio * 100)}% ของงบวันนี้` : 'วันนี้ไม่ได้อยู่ในวันใช้งาน'}</div>
+          {c.todayActive && <LoadPicker tracker={tracker} c={c} onLoad={onLoad} />}
           <dl className="kv">
             <dt>งบวันนี้ (ปรับตามที่เหลือจริง)</dt><dd>{fmtU(c.todayBudget, u)}</dd>
             <dt>เหลือใช้ได้วันนี้</dt><dd>{fmtU(Math.max(0, c.todayBudget - c.usedToday), u)}</dd>
@@ -232,6 +254,42 @@ function Today({ tracker, c }: { tracker: Tracker; c: Budget }) {
       ) : (
         <p className="muted">กำลังดูสัปดาห์ย้อนหลัง — สรุปอยู่ด้านบนและกราฟด้านล่าง</p>
       )}
+    </div>
+  );
+}
+
+function LoadPicker({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (day: string, factor: number) => void }) {
+  const i = c.todayIdx;
+  const cur = c.load[i];
+  // ใช้หนักจริงแล้ววันนี้ → ล็อก, เคยใช้หนักจริงวันอื่นในรอบนี้ → หมดสิทธิ์หนักมาก
+  const locked = c.heavyUsedIdx === i;
+  const heavyGone = c.heavyUsedIdx >= 0 && !locked;
+  const titleOf = (f: number) =>
+    locked ? 'ล็อกแล้ว — วันนี้ใช้หนักมากจริงแล้ว'
+    : f === HEAVY && heavyGone ? `ใช้สิทธิ์หนักมากของรอบนี้ไปแล้ว (${dateTH(c.slices[c.heavyUsedIdx].start)})`
+    : f === 1 ? 'งบตามปกติ'
+    : `งบวันนี้ ×${f} แล้วเกลี่ยส่วนต่างไปวันอื่น`;
+  return (
+    <div className="load-pick">
+      <div className="row">
+        <span className="muted sm">วันนี้จะใช้</span>
+        <div className="seg" role="radiogroup" aria-label="ระดับการใช้วันนี้">
+          {LOAD_LEVELS.map((l) => (
+            <button key={l.factor} type="button" role="radio" aria-checked={cur === l.factor}
+              className={cur === l.factor ? 'active' : ''} title={titleOf(l.factor)}
+              disabled={locked || (l.factor === HEAVY && heavyGone)}
+              onClick={() => onLoad(dayKey(c.slices[i].start), l.factor)}>
+              {locked && cur === l.factor ? '🔒 ' : ''}{l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="muted sm hint">
+        {locked ? 'ล็อกแล้ว — วันนี้ใช้หนักจริง นับเป็นสิทธิ์หนักมากของรอบนี้'
+          : cur === HEAVY ? `หนักมากใช้ได้รอบละครั้ง — จะนับและล็อกเมื่อใช้เกิน ${fmtU(c.heavyAt[i], tracker.unit)} (ตอนนี้ยังเปลี่ยนได้)`
+          : heavyGone ? `ใช้สิทธิ์หนักมากของรอบนี้ไปแล้ว (${dateTH(c.slices[c.heavyUsedIdx].start)})`
+          : 'หนักมากใช้ได้รอบละครั้ง'}
+      </div>
     </div>
   );
 }

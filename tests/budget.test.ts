@@ -99,3 +99,60 @@ describe('buddyAdvice: อารมณ์ตัวละคร', () => {
     expect(buddyAdvice(tracker({ active_days: '1101111' }), c).mood).toBe('sleepy');
   });
 });
+
+describe('compute: ระดับการใช้รายวัน (loads)', () => {
+  it('วันนี้ใช้มาก ×2 → งบวันนี้เพิ่ม วันอื่นลด รวมยังเท่า usable', () => {
+    const t = tracker({ reset_hour: 0 });
+    const base = compute(t, [], at(26, 0), at(28, 10));
+    const c = compute(t, [], at(26, 0), at(28, 10), { '2026-10-28': 2 });
+    expect(c.load[2]).toBe(2);
+    expect(c.weight[2]).toBeCloseTo(2);
+    expect(sum(c.weight)).toBeCloseTo(8);
+    // วันนี้ (พ.) เหลือ พ.–อา. = น้ำหนัก 2 + 4 = 6
+    expect(c.todayBudget).toBeCloseTo(90 * 2 / 6);
+    expect(c.todayBudget).toBeGreaterThan(base.todayBudget);
+    expect(c.baseDaily).toBeLessThan(base.baseDaily);
+  });
+
+  it('วันนี้ใช้น้อย ×0.5 → งบวันนี้ครึ่งของวันปกติ', () => {
+    const c = compute(tracker({ reset_hour: 0 }), [], at(26, 0), at(26, 10), { '2026-10-26': 0.5 });
+    // น้ำหนักรวม 0.5 + 6 → วันนี้ได้ครึ่งหนึ่งของวันปกติ
+    expect(c.todayBudget).toBeCloseTo(90 * 0.5 / 6.5);
+    expect(c.baseDaily).toBeCloseTo(90 / 6.5);
+  });
+
+  it('ตัวคูณไม่ทำให้วันพักมีงบ', () => {
+    const c = compute(tracker({ reset_hour: 0, active_days: '0111110' }), [], at(26, 0), at(26, 10), { '2026-11-01': 2 });
+    expect(c.weight[6]).toBe(0);
+  });
+});
+
+describe('compute: หนักมาก ใช้ได้รอบละครั้ง และล็อกเมื่อใช้หนักจริง', () => {
+  const t = tracker({ reset_hour: 0 }); // 7 วันเต็ม, usable 90
+
+  it('เลือกหนักมากแต่ยังใช้ไม่เกินงบปกติ → ยังไม่ล็อก', () => {
+    const c = compute(t, [use(at(28, 9), 10)], at(26, 0), at(28, 10), { '2026-10-28': 2 });
+    expect(c.heavyAt[2]).toBeCloseTo(90 / 5); // งบวันปกติจาก พ.–อา. (5 วัน)
+    expect(c.heavyUsedIdx).toBe(-1);
+    expect(c.load[2]).toBe(2);
+  });
+
+  it('ใช้เกินงบวันปกติ → นับเป็นหนักมากจริง (ล็อก)', () => {
+    const c = compute(t, [use(at(28, 9), 20)], at(26, 0), at(28, 10), { '2026-10-28': 2 });
+    expect(c.heavyUsedIdx).toBe(2);
+  });
+
+  it('วันที่ผ่านไปที่เลือกหนักมากแต่ไม่ได้ใช้หนัก → กลับเป็นปกติ และคืนสิทธิ์', () => {
+    const c = compute(t, [use(at(27, 9), 5)], at(26, 0), at(28, 10), { '2026-10-27': 2 });
+    expect(c.load[1]).toBe(1);
+    expect(c.heavyUsedIdx).toBe(-1);
+    expect(c.baseDaily).toBeCloseTo(90 / 7);
+  });
+
+  it('วันที่ผ่านไปที่ใช้หนักจริง → ยังได้น้ำหนัก ×2 และหมดสิทธิ์', () => {
+    const c = compute(t, [use(at(27, 9), 30)], at(26, 0), at(28, 10), { '2026-10-27': 2 });
+    expect(c.load[1]).toBe(2);
+    expect(c.heavyUsedIdx).toBe(1);
+    expect(c.baseDaily).toBeCloseTo(90 / 8);
+  });
+});
