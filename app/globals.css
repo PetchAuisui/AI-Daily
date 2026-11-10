@@ -255,3 +255,8 @@ a.btn { text-decoration: none; display: inline-block; }
 .swatches { display: flex; gap: .45rem; margin-top: .55rem; }
 .swatches button { width: 1.6rem; height: 1.6rem; border-radius: 50%; cursor: pointer; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); }
 .swatches button.on { box-shadow: 0 0 0 2px var(--primary); }
+
+/* ระดับการใช้วันนี้ */
+.load-pick { display: flex; align-items: center; gap: .6rem; margin-top: .8rem; }
+.load-pick .seg { flex: 1; }
+.load-pick .seg button { padding: .35rem .3rem; font-size: .8rem; }

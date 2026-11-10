@@ -23,6 +23,22 @@ export function weekStartFor(t: Pick<Tracker, 'reset_dow' | 'reset_hour'>, now =
   return d;
 }
 
+/** ระดับการใช้ของวัน: ตัวคูณน้ำหนักงบของวันนั้น (1 = ปกติ) */
+export const LOAD_LEVELS = [
+  { factor: 0.5, label: 'ใช้น้อย' },
+  { factor: 1, label: 'ปกติ' },
+  { factor: 1.5, label: 'ใช้มาก' },
+  { factor: 2, label: 'หนักมาก' },
+] as const;
+export const isLoadFactor = (f: number) => LOAD_LEVELS.some((l) => l.factor === f);
+/** วันที่ตามเวลาท้องถิ่น 'YYYY-MM-DD' — ใช้เป็น key ของ day_loads */
+export function dayKey(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+/** key ของวัน → ตัวคูณ (วันที่ไม่มี key = 1) */
+export type DayLoads = Record<string, number>;
+
 export function addDays(d: Date, n: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + n); // setDate รองรับ DST ได้ดีกว่าบวก ms ตรงๆ
@@ -42,13 +58,15 @@ function slicesOf(start: Date): Slice[] {
   return cuts.slice(0, -1).map((s, i) => ({ start: s, end: cuts[i + 1] }));
 }
 
-export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now: Date) {
+export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now: Date, loads: DayLoads = {}) {
   const slices = slicesOf(weekStart);
   const n = slices.length;
   const weekEnd = slices[n - 1].end;
   const active = slices.map((s) => t.active_days[s.start.getDay()] === '1');
-  // น้ำหนักงบของแต่ละช่วง = ความยาวเป็นวัน (ช่วงไม่เต็มวันได้งบตามสัดส่วน), วันพัก = 0
-  const weight = slices.map((s, i) => (active[i] ? (+s.end - +s.start) / DAY_MS : 0));
+  // ตัวคูณที่ผู้ใช้ตั้ง (วันนี้ใช้น้อย/มาก) — งบส่วนที่เพิ่ม/ลดจะเกลี่ยไปวันอื่นในรอบ
+  const load = slices.map((s) => loads[dayKey(s.start)] ?? 1);
+  // น้ำหนักงบของแต่ละช่วง = ความยาวเป็นวัน × ตัวคูณ (ช่วงไม่เต็มวันได้งบตามสัดส่วน), วันพัก = 0
+  const weight = slices.map((s, i) => (active[i] ? ((+s.end - +s.start) / DAY_MS) * load[i] : 0));
   const wSum = (from: number, to = n) => weight.slice(Math.max(0, from), to).reduce((a, b) => a + b, 0);
   const perDay = slices.map((s) => entries.filter((e) => e.ts >= +s.start && e.ts < +s.end).reduce((a, e) => a + e.amount, 0));
 
@@ -107,7 +125,7 @@ export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now:
   });
 
   return {
-    slices, active, weight, perDay, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
+    slices, active, load, weight, perDay, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
     isCurrent, todayIdx, usedToday, todayActive, todayBudget, nextDaily, activeAfterToday,
     expected, runOut, hoursLeftToday, weekEnd,
   };

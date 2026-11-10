@@ -54,3 +54,12 @@ CREATE TABLE IF NOT EXISTS usage (
   note       TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS usage_tracker_ts ON usage (tracker_id, ts);
+
+-- ระดับการใช้รายวัน (วันนี้ใช้น้อย/มาก) — day = วันที่ตามเวลาท้องถิ่นของผู้ใช้ 'YYYY-MM-DD'
+-- ไม่มีแถว = ปกติ (factor 1)
+CREATE TABLE IF NOT EXISTS day_loads (
+  tracker_id INTEGER NOT NULL REFERENCES trackers(id) ON DELETE CASCADE,
+  day        TEXT NOT NULL,
+  factor     DOUBLE PRECISION NOT NULL,
+  PRIMARY KEY (tracker_id, day)
+);
