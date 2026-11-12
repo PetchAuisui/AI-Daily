@@ -156,7 +156,8 @@ export function statusOf(c: Budget): Status {
   if (c.remaining <= 0) return 'over';
   if (!c.todayActive) return 'off';
   const r = c.todayBudget > 0 ? c.usedToday / c.todayBudget : c.usedToday > 0 ? 2 : 0;
-  if (r >= 1) return 'over';
+  // ใช้ครบพอดีไม่นับว่าเกิน — ให้ตรงกับกราฟที่เป็นสีแดงเมื่อเกินแผนจริงเท่านั้น
+  if (r > 1 + 1e-9) return 'over';
   if (r >= 0.75) return 'warn';
   return 'ok';
 }
@@ -205,7 +206,7 @@ export function buddyAdvice(t: Tracker, c: Budget): Advice {
     tips.push(['ลดการใช้: เปิดแชทใหม่แทนแชทยาว, ใช้รุ่นเล็กกับงานง่าย, สรุปบริบทก่อนส่ง, หลีกเลี่ยงแนบไฟล์ใหญ่ซ้ำ']);
   } else if (st === 'warn') {
     mood = 'worried'; tone = 'warn';
-    title = `ใกล้ครบงบวันนี้แล้ว เหลืออีก ${fmtU(leftToday, u)}`;
+    title = leftToday <= 1e-9 ? 'ใช้ครบงบวันนี้พอดีแล้ว' : `ใกล้ครบงบวันนี้แล้ว เหลืออีก ${fmtU(leftToday, u)}`;
     if (c.hoursLeftToday > 0.5) tips.push([`เหลือเวลาอีก ${c.hoursLeftToday.toFixed(1)} ชม. → ~${fmtU(leftToday / c.hoursLeftToday, u)}/ชม.`]);
     tips.push(['เก็บงานหนักไว้พรุ่งนี้ วันนี้ใช้กับงานสั้นๆ พอ']);
   } else {

@@ -233,7 +233,7 @@ function Today({ tracker, c, onLoad }: { tracker: Tracker; c: Budget; onLoad: (d
     <div className="card">
       <div className="card-head">
         <h3>วันนี้</h3>
-        <span className={`badge ${st}`}>{BADGE[st] ?? (c.isCurrent ? 'วันพัก' : '—')}</span>
+        <span className={`badge ${st}`}>{st === 'warn' && ratio >= 1 - 1e-9 ? 'ครบงบ' : BADGE[st] ?? (c.isCurrent ? 'วันพัก' : '—')}</span>
       </div>
       {c.isCurrent ? (
         <>

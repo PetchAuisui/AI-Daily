@@ -77,6 +77,14 @@ describe('compute: งบรายวัน', () => {
     expect(statusOf(c)).toBe('over');
   });
 
+  it('ใช้ครบงบวันนี้พอดี → ยังไม่ over (ตรงกับกราฟ)', () => {
+    const c0 = compute(tracker(), [], at(26, 19), at(27, 12));
+    const c = compute(tracker(), [use(at(27, 10), c0.todayBudget)], at(26, 19), at(27, 12));
+    expect(statusOf(c)).toBe('warn');
+    const c2 = compute(tracker(), [use(at(27, 10), c0.todayBudget + 0.5)], at(26, 19), at(27, 12));
+    expect(statusOf(c2)).toBe('over');
+  });
+
   it('รอบที่จบแล้ว todayIdx = จำนวนแท่ง', () => {
     const c = compute(tracker(), [], at(26, 19), new Date(2026, 10, 3, 9));
     expect(c.isCurrent).toBe(false);
