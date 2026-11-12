@@ -85,6 +85,18 @@ describe('compute: งบรายวัน', () => {
     expect(statusOf(c2)).toBe('over');
   });
 
+  it('แผนสะสมของวันนี้ = ยอดก่อนวันนี้ + งบวันนี้ → กราฟแดงเมื่อการ์ดเกินงบเท่านั้น', () => {
+    const ws = at(26, 19), now = at(29, 23);
+    const past = [use(at(26, 20), 11), use(at(27, 12), 8), use(at(28, 12), 14)];
+    const c0 = compute(tracker(), past, ws, now);
+    const i = c0.todayIdx;
+    expect(c0.cumPlan[i]).toBeCloseTo(33 + c0.todayBudget);
+    expect(c0.cumPlan[c0.slices.length - 1]).toBeCloseTo(c0.usable);
+    const c = compute(tracker(), [...past, use(at(29, 12), c0.todayBudget + 0.1)], ws, now);
+    expect(statusOf(c)).toBe('over');
+    expect(sum(c.perDay.slice(0, i + 1))).toBeGreaterThan(c.cumPlan[i]);
+  });
+
   it('รอบที่จบแล้ว todayIdx = จำนวนแท่ง', () => {
     const c = compute(tracker(), [], at(26, 19), new Date(2026, 10, 3, 9));
     expect(c.isCurrent).toBe(false);

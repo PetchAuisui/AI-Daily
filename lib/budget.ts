@@ -143,8 +143,19 @@ export function compute(t: Tracker, entries: UsageEntry[], weekStart: Date, now:
     return i === todayIdx ? todayBudget : nextDaily * weight[i];
   });
 
+  // แผนสะสมสำหรับกราฟ: วันที่ผ่านไปแล้วใช้แผนตั้งต้น; ตั้งแต่วันนี้ไปใช้แผนที่ปรับตามที่เหลือจริง
+  // (ยอดก่อนวันนี้ + งบวันนี้ + งบวันถัดไป) — เส้นวันนี้จึงตรงกับหลอด "งบวันนี้" ในการ์ด
+  // วันถัดไปเริ่มนับจากหลังจบวันนี้ (งบวันนี้ทั้งก้อน หรือที่ใช้จริงถ้าเกิน) แล้วเกลี่ยที่เหลือจนถึง usable
+  const afterToday = usedBefore + Math.max(usedToday, todayBudget);
+  const futureW = wSum(todayIdx + 1);
+  const cumPlan = slices.map((_, i) => {
+    if (!isCurrent || i < todayIdx) return baseDaily * wSum(0, i + 1);
+    if (i === todayIdx) return usedBefore + todayBudget;
+    return afterToday + (futureW > 0 ? (Math.max(0, usable - afterToday) * wSum(todayIdx + 1, i + 1)) / futureW : 0);
+  });
+
   return {
-    slices, active, load, weight, perDay, heavyAt, heavyUsedIdx, plan, L, reserve, usable, activeCount, baseDaily, used, remaining,
+    slices, active, load, weight, perDay, heavyAt, heavyUsedIdx, plan, cumPlan, L, reserve, usable, activeCount, baseDaily, used, remaining,
     isCurrent, todayIdx, usedToday, todayActive, todayBudget, nextDaily, activeAfterToday,
     expected, runOut, hoursLeftToday, weekEnd,
   };
