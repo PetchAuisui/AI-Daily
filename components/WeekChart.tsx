@@ -8,8 +8,8 @@ export default function WeekChart({ c, unit }: { c: Budget; unit: string }) {
   const iw = W - PL - PR, ih = H - PT - PB;
   const cum = c.perDay.map((_, i) => c.perDay.slice(0, i + 1).reduce((a, b) => a + b, 0));
   const n = c.slices.length;
-  // เส้น pace: งบตั้งต้นสะสมตามวันใช้งาน (ช่วงไม่เต็มวันคิดตามสัดส่วน) จบที่ usable
-  const cumPlan = c.weight.map((_, i) => c.baseDaily * c.weight.slice(0, i + 1).reduce((a, b) => a + b, 0));
+  // เส้นแผนสะสม: อดีตใช้แผนตั้งต้น, ตั้งแต่วันนี้ใช้แผนที่ปรับแล้ว (ตรงกับการ์ดวันนี้)
+  const { cumPlan } = c;
   // ปกติสุดที่ 100% ของโควต้า; ถ้าใช้เกินก็ขยายทีละ 25%
   const step = c.L / 4;
   const ticks = Math.max(4, Math.ceil(cum[n - 1] / step));
