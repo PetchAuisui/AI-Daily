@@ -12,6 +12,13 @@ npm run db:migrate           # สร้างตาราง (รันซ้�
 npm run dev                  # http://localhost:3000
 ```
 
+## ทดสอบ
+
+```bash
+npm test                     # vitest (ตั้ง TZ=Asia/Bangkok ให้แล้ว)
+npm run typecheck            # tsc --noEmit
+```
+
 ## Deploy (Vercel + Neon, ฟรี)
 
 `npm run build` จะรัน migration ให้อัตโนมัติถ้ามี `DATABASE_URL` (ไม่มีก็ข้าม) จึงไม่ต้องสร้างตารางเอง
